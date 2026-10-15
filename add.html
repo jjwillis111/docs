@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Add a Document</title>
+<link rel="stylesheet" href="site.css">
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 20px; }
+  .panel { padding: 18px 20px; }
+  .panel h2 { font-size: 16px; margin: 0 0 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    font: inherit;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  .pastezone {
+    margin-top: 14px;
+    border: 2px dashed var(--line);
+    border-radius: 8px;
+    padding: 34px 16px;
+    text-align: center;
+    color: var(--muted);
+    outline: none;
+    cursor: text;
+    min-height: 120px;
+  }
+  .pastezone:focus { border-color: var(--accent); color: var(--ink); }
+  .pastezone.has { border-style: solid; border-color: var(--ok); color: var(--ink); }
+  .pastezone strong { display: block; font-size: 17px; color: var(--ink); margin-bottom: 4px; }
+  .facts { margin: 12px 0 0; padding-left: 1.4em; }
+  .facts li { margin: 2px 0; }
+  .facts .warn { color: var(--warn); }
+  .facts .err { color: var(--err); }
+  .preview { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .preview iframe { height: 520px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .hint { color: var(--muted); font-size: 13.5px; margin: 8px 0 0; }
+  .msg { margin-top: 10px; font-size: 14px; }
+  .msg.ok { color: var(--ok); }
+  .msg.err { color: var(--err); }
+  details summary { cursor: pointer; font-weight: 600; }
+  details[open] summary { margin-bottom: 12px; }
+  ol.steps { padding-left: 1.4em; margin: 0 0 14px; }
+  ol.steps li { margin: 3px 0; }
+  ul.doclist { list-style: none; margin: 0; padding: 0; }
+  ul.doclist li {
+    display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    padding: 9px 0; border-top: 1px solid var(--line);
+  }
+  ul.doclist li:first-child { border-top: 0; }
+  ul.doclist .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  ul.doclist .f { color: var(--muted); font-size: 12.5px; display: block; }
+  code { font-size: 13px; background: var(--box-bg); padding: 1px 5px; border-radius: 4px; }
+  textarea.snippet {
+    width: 100%; height: 120px; font: 12.5px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--box-bg); color: var(--ink);
+  }
+</style>
+</head>
+<body>
+<header class="site">
+  <h1>Add a Document</h1>
+  <p>Select all in Word, copy, and paste below. The site stores Word's own formatting so readers can copy it back into Word. <a href="./">Back to the site</a></p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>1. Paste from Word</h2>
+    <div class="grid2">
+      <div>
+        <label for="title">Title shown on the site</label>
+        <input type="text" id="title" placeholder="e.g. Space Law Note">
+      </div>
+      <div>
+        <label for="desc">Short description (optional)</label>
+        <input type="text" id="desc" placeholder="e.g. Final draft, October 2026">
+      </div>
+    </div>
+    <div class="pastezone" id="zone" contenteditable="true" spellcheck="false" tabindex="0">
+      <strong>Click here, then paste</strong>
+      In Word: Ctrl+A then Ctrl+C (Mac: Cmd+A, Cmd+C). Here: Ctrl+V (Mac: Cmd+V).
+    </div>
+    <ul class="facts" id="facts" hidden></ul>
+    <div class="preview" id="previewWrap" hidden>
+      <iframe class="docframe" id="preview" sandbox title="Preview"></iframe>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>2. Save it to the site</h2>
+    <div class="row">
+      <button class="primary" id="publishBtn" disabled>Publish to site</button>
+      <button id="downloadBtn" disabled>Download file instead</button>
+      <button id="testCopyBtn" disabled>Test the Copy button</button>
+    </div>
+    <p class="hint" id="publishHint">Publishing needs the GitHub connection below. Without it, download the file and upload it by hand.</p>
+    <div class="msg" id="saveMsg"></div>
+    <div id="manual" hidden>
+      <p class="hint">Upload the downloaded file into your repository's <code>docs</code> folder, then add this entry to <code>documents.json</code> (inside the square brackets, separated from other entries by a comma):</p>
+      <textarea class="snippet" id="snippet" readonly></textarea>
+    </div>
+  </section>
+
+  <section class="panel">
+    <details id="ghPanel">
+      <summary>GitHub connection <span id="ghState" style="font-weight:normal;color:var(--muted)"></span></summary>
+      <ol class="steps">
+        <li>On GitHub, open Settings, then Developer settings, then Personal access tokens, then <strong>Fine-grained tokens</strong>, and click <strong>Generate new token</strong>.</li>
+        <li>Under Repository access choose <strong>Only select repositories</strong> and pick this site's repository.</li>
+        <li>Under Permissions, set <strong>Contents</strong> to <strong>Read and write</strong>. Leave everything else alone.</li>
+        <li>Generate the token, copy it, and paste it below.</li>
+      </ol>
+      <div class="grid2">
+        <div><label for="owner">GitHub username</label><input type="text" id="owner" autocomplete="off"></div>
+        <div><label for="repo">Repository name</label><input type="text" id="repo" autocomplete="off"></div>
+        <div><label for="branch">Branch</label><input type="text" id="branch" value="main" autocomplete="off"></div>
+        <div><label for="token">Token</label><input type="password" id="token" autocomplete="off" placeholder="github_pat_..."></div>
+      </div>
+      <div class="row">
+        <label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" id="remember" checked> Remember on this device</label>
+        <button id="saveGh">Connect</button>
+        <button id="forgetGh">Forget</button>
+      </div>
+      <p class="hint">The token stays in this browser only. It is never written into the site. Anyone without it can open this page but cannot change anything.</p>
+      <div class="msg" id="ghMsg"></div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2>Documents on the site</h2>
+    <ul class="doclist" id="docList"><li class="t" style="color:var(--muted)">Loading…</li></ul>
+    <p class="hint">Publishing a document with the same title replaces it. Changes appear on the live site a minute or two after saving.</p>
+  </section>
+</main>
+
+<script src="common.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const D = window.DocShare;
+  let pasted = null;      // the raw Word HTML
+  let gh = null;          // { owner, repo, branch, token }
+  let docs = [];          // current documents.json
+
+  // ---------- GitHub connection ----------
+  function guessRepo() {
+    const h = location.hostname;
+    if (h.endsWith(".github.io")) {
+      const owner = h.split(".")[0];
+      const seg = location.pathname.split("/").filter(Boolean)[0];
+      const repo = seg && !/\.html?$/.test(seg) ? seg : owner + ".github.io";
+      return { owner, repo };
+    }
+    return { owner: "", repo: "" };
+  }
+  function loadGh() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("docshare-gh") || "null"); } catch (e) {}
+    const g = guessRepo();
+    $("owner").value = (saved && saved.owner) || g.owner;
+    $("repo").value = (saved && saved.repo) || g.repo;
+    $("branch").value = (saved && saved.branch) || "main";
+    $("token").value = (saved && saved.token) || "";
+    if (saved && saved.token) gh = saved;
+    showGhState();
+  }
+  function showGhState() {
+    $("ghState").textContent = gh ? "· connected to " + gh.owner + "/" + gh.repo : "· not connected";
+    $("publishBtn").disabled = !(pasted && gh);
+    $("publishHint").hidden = !!gh;
+    if (!gh) $("ghPanel").open = true;
+  }
+
+  async function api(path, opts) {
+    const res = await fetch("https://api.github.com/repos/" + gh.owner + "/" + gh.repo + "/" + path, Object.assign({
+      headers: {
+        "Authorization": "Bearer " + gh.token,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }, opts || {}));
+    return res;
+  }
+  async function getFile(path) {
+    const res = await api("contents/" + path + "?ref=" + encodeURIComponent(gh.branch) + "&t=" + Date.now());
+    if (res.status === 404) return null;
+    if (!res.ok) throw await apiError(res, "read " + path);
+    const j = await res.json();
+    return { sha: j.sha, text: j.content ? D.b64ToUtf8(j.content) : null };
+  }
+  async function putFile(path, text, message, sha) {
+    const body = { message, content: D.utf8ToB64(text), branch: gh.branch };
+    if (sha) body.sha = sha;
+    const res = await api("contents/" + path, { method: "PUT", body: JSON.stringify(body) });
+    if (!res.ok) throw await apiError(res, "save " + path);
+    return res.json();
+  }
+  async function deleteFile(path, message, sha) {
+    const res = await api("contents/" + path, { method: "DELETE", body: JSON.stringify({ message, sha, branch: gh.branch }) });
+    if (!res.ok && res.status !== 404) throw await apiError(res, "delete " + path);
+  }
+  async function apiError(res, what) {
+    let detail = "";
+    try { detail = (await res.json()).message || ""; } catch (e) {}
+    const hints = {
+      401: "The token was rejected. It may be mistyped or expired.",
+      403: "The token doesn't have permission. Check that Contents is set to Read and write for this repository.",
+      404: "Repository or branch not found. Check the username, repository name, and branch."
+    };
+    return new Error("Couldn't " + what + ". " + (hints[res.status] || detail || ("GitHub returned " + res.status + ".")));
+  }
+
+  $("saveGh").onclick = async () => {
+    const g = {
+      owner: $("owner").value.trim(),
+      repo: $("repo").value.trim(),
+      branch: $("branch").value.trim() || "main",
+      token: $("token").value.trim()
+    };
+    const msg = $("ghMsg");
+    msg.className = "msg"; msg.textContent = "Checking…";
+    if (!g.owner || !g.repo || !g.token) { msg.className = "msg err"; msg.textContent = "Fill in the username, repository, and token."; return; }
+    gh = g;
+    try {
+      const res = await api("branches/" + encodeURIComponent(g.branch));
+      if (!res.ok) throw await apiError(res, "reach the repository");
+      try {
+        if ($("remember").checked) localStorage.setItem("docshare-gh", JSON.stringify(g));
+        else localStorage.removeItem("docshare-gh");
+      } catch (e) {}
+      msg.className = "msg ok"; msg.textContent = "Connected.";
+      $("ghPanel").open = false;
+      showGhState();
+      loadDocs();
+    } catch (e) {
+      gh = null; showGhState();
+      msg.className = "msg err"; msg.textContent = e.message;
+    }
+  };
+  $("forgetGh").onclick = () => {
+    try { localStorage.removeItem("docshare-gh"); } catch (e) {}
+    gh = null; $("token").value = "";
+    $("ghMsg").className = "msg"; $("ghMsg").textContent = "Token removed from this browser.";
+    showGhState();
+  };
+
+  // ---------- Paste ----------
+  const zone = $("zone");
+  zone.addEventListener("paste", e => {
+    e.preventDefault();
+    const cd = e.clipboardData;
+    const html = cd && cd.getData("text/html");
+    const facts = $("facts");
+    facts.hidden = false;
+    if (!html || !html.trim()) {
+      pasted = null;
+      facts.innerHTML = '<li class="err">That paste had no formatting, only plain text. Copy directly from the Word desktop app and paste here in Chrome, Edge, or Firefox.</li>';
+      updateButtons();
+      return;
+    }
+    pasted = html;
+    zone.classList.add("has");
+    zone.innerHTML = "<strong>Pasted</strong>Paste again to replace it.";
+    describe(html);
+    $("preview").srcdoc = D.viewHtml(html);
+    $("previewWrap").hidden = false;
+    if (!$("title").value.trim()) {
+      const first = D.plainText(html).split("\n").map(s => s.trim()).find(Boolean) || "";
+      $("title").value = first.slice(0, 80);
+    }
+    updateButtons();
+  });
+  // Typing in the box does nothing; only pasting counts
+  zone.addEventListener("beforeinput", e => { if (e.inputType !== "insertFromPaste") e.preventDefault(); });
+  zone.addEventListener("drop", e => e.preventDefault());
+
+  function describe(html) {
+    const text = D.plainText(html);
+    const words = (text.match(/\S+/g) || []).length;
+    const notes = new Set();
+    (html.match(/_ftn(\d+)/g) || []).forEach(m => notes.add(m));
+    (html.match(/_edn(\d+)/g) || []).forEach(m => notes.add(m));
+    const kb = Math.round(new Blob([html]).size / 1024);
+    const fromWord = /urn:schemas-microsoft-com:office:word|class="?Mso|mso-/i.test(html);
+    const localImgs = (html.match(/src=["']?file:/gi) || []).length;
+    const items = [];
+    items.push("<li>" + words.toLocaleString() + " words, " + kb.toLocaleString() + " KB of formatting data</li>");
+    items.push("<li>" + (notes.size ? notes.size + " footnotes found" : "No footnotes found") + "</li>");
+    if (!fromWord) items.push('<li class="warn">This doesn\'t look like it came from Word. It will still work, but Word-specific formatting may be missing.</li>');
+    if (localImgs) items.push('<li class="warn">' + localImgs + " image" + (localImgs > 1 ? "s" : "") + " won't carry over (Word points to files on your computer). Text and footnotes are unaffected.</li>");
+    $("facts").innerHTML = items.join("");
+  }
+
+  function updateButtons() {
+    $("downloadBtn").disabled = !pasted;
+    $("testCopyBtn").disabled = !pasted;
+    $("publishBtn").disabled = !(pasted && gh);
+  }
+
+  function slugify(s) {
+    return s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "document";
+  }
+  function entry() {
+    const title = $("title").value.trim() || "Untitled document";
+    const e = { title, file: "docs/" + slugify(title) + ".html" };
+    const d = $("desc").value.trim();
+    if (d) e.description = d;
+    return e;
+  }
+
+  $("testCopyBtn").onclick = async () => {
+    const ok = await D.copyRich(pasted, D.plainText(pasted));
+    D.toast(ok ? "Copied. Paste into a new Word document to check it." : "Your browser blocked copying.", 3200);
+  };
+
+  $("downloadBtn").onclick = () => {
+    const e = entry();
+    const blob = new Blob([pasted], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = e.file.split("/").pop();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    $("snippet").value = JSON.stringify(e, null, 2);
+    $("manual").hidden = false;
+  };
+
+  $("publishBtn").onclick = async () => {
+    const e = entry();
+    const msg = $("saveMsg");
+    const btn = $("publishBtn");
+    btn.disabled = true;
+    msg.className = "msg"; msg.textContent = "Saving the document…";
+    try {
+      const existing = await getFile(e.file);
+      await putFile(e.file, pasted, (existing ? "Update " : "Add ") + e.title, existing && existing.sha);
+      msg.textContent = "Updating the document list…";
+      const list = await getFile("documents.json");
+      let arr = [];
+      if (list && list.text) { try { arr = JSON.parse(list.text); } catch (err) { arr = []; } }
+      if (!Array.isArray(arr)) arr = [];
+      const i = arr.findIndex(x => x.file === e.file);
+      if (i >= 0) arr[i] = e; else arr.push(e);
+      await putFile("documents.json", JSON.stringify(arr, null, 2) + "\n", "List " + e.title, list && list.sha);
+      docs = arr;
+      renderDocs();
+      msg.className = "msg ok";
+      msg.textContent = (existing ? "Updated" : "Published") + " “" + e.title + ".” It will show on the site in a minute or two.";
+    } catch (err) {
+      msg.className = "msg err"; msg.textContent = err.message;
+    } finally {
+      btn.disabled = !(pasted && gh);
+    }
+  };
+
+  // ---------- Existing documents ----------
+  async function loadDocs() {
+    try {
+      if (gh) {
+        const f = await getFile("documents.json");
+        docs = f && f.text ? JSON.parse(f.text) : [];
+      } else {
+        const r = await fetch("documents.json", { cache: "no-cache" });
+        docs = r.ok ? await r.json() : [];
+      }
+    } catch (e) { docs = []; }
+    if (!Array.isArray(docs)) docs = [];
+    renderDocs();
+  }
+  function renderDocs() {
+    const ul = $("docList");
+    ul.innerHTML = "";
+    if (!docs.length) {
+      ul.innerHTML = '<li class="t" style="color:var(--muted)">None yet.</li>';
+      return;
+    }
+    docs.forEach((d, i) => {
+      const li = document.createElement("li");
+      const t = document.createElement("span");
+      t.className = "t";
+      t.textContent = d.title;
+      const f = document.createElement("span");
+      f.className = "f";
+      f.textContent = d.file;
+      t.appendChild(f);
+      li.appendChild(t);
+      if (gh) {
+        const b = document.createElement("button");
+        b.textContent = "Remove";
+        b.onclick = () => removeDoc(i, b);
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
+    });
+  }
+  async function removeDoc(i, btn) {
+    const d = docs[i];
+    if (!confirm("Remove “" + d.title + "” from the site?")) return;
+    btn.disabled = true;
+    try {
+      const list = await getFile("documents.json");
+      let arr = list && list.text ? JSON.parse(list.text) : [];
+      arr = arr.filter(x => x.file !== d.file);
+      await putFile("documents.json", JSON.stringify(arr, null, 2) + "\n", "Unlist " + d.title, list && list.sha);
+      const f = await getFile(d.file);
+      if (f) await deleteFile(d.file, "Remove " + d.title, f.sha);
+      docs = arr;
+      renderDocs();
+      D.toast("Removed. The site updates in a minute or two.");
+    } catch (e) {
+      btn.disabled = false;
+      D.toast(e.message, 5000);
+    }
+  }
+
+  loadGh();
+  loadDocs();
+})();
+</script>
+</body>
+</html>
